@@ -54,3 +54,36 @@ class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     version: str
+
+
+# ----------------------------- score prediction ----------------------------- #
+class ScorePredictRequest(BaseModel):
+    team_a: str = Field(..., examples=["Brazil"])
+    team_b: str = Field(..., examples=["Germany"])
+    neutral: bool = True
+    host: Optional[Literal["A", "B", "none"]] = "none"
+
+
+class Scoreline(BaseModel):
+    team_a: int
+    team_b: int
+    probability: float
+    label: str
+
+
+class MostLikelyScore(BaseModel):
+    team_a: int
+    team_b: int
+    probability: float
+    text: str
+
+
+class ScorePredictResponse(BaseModel):
+    team_a: str
+    team_b: str
+    expected_goals: dict          # {"team_a": .., "team_b": ..}
+    most_likely_score: MostLikelyScore
+    top_scorelines: List[Scoreline]
+    outcome_probabilities: dict   # {"team_a": .., "draw": .., "team_b": ..}
+    rho: float
+    model_name: str

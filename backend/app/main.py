@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import SessionLocal, init_db
 from .prediction import service
-from .routers import health, predict, performance, teams
+from .routers import health, predict, performance, teams, score
 
 
 def create_app() -> FastAPI:
@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for r in (health.router, teams.router, predict.router, performance.router):
+    for r in (health.router, teams.router, predict.router, performance.router, score.router):
         app.include_router(r, prefix="/api")
 
     @app.on_event("startup")

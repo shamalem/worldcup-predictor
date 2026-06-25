@@ -14,6 +14,7 @@ export default function About() {
           <li><span className="num">2</span><span><b>Features</b> — per-team win rate, goals for/against, goal difference, match &amp; knockout experience, head-to-head, host advantage, stage and era — all computed from matches before the fixture.</span></li>
           <li><span className="num">3</span><span><b>Models</b> — Logistic Regression, Random Forest and XGBoost are trained and compared; the best by validation log loss is served.</span></li>
           <li><span className="num">4</span><span><b>Explainability</b> — SHAP contributions per prediction, converted to template sentences. No LLM involved.</span></li>
+          <li><span className="num">5</span><span><b>Scoreline model</b> — a separate Poisson + Dixon-Coles model estimates each side's expected goals and produces a probability for every scoreline, giving the most likely exact score alongside the win/draw/loss call.</span></li>
         </ol>
       </div>
 

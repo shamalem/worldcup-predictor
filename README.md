@@ -24,6 +24,10 @@ React + TypeScript (Vite)  ──►  FastAPI  ──►  scikit-learn / XGBoost
   Team A / Team B.
 - **Model bake-off** — Logistic Regression, Random Forest and XGBoost are trained and
   compared; the best one (lowest validation log loss) is served.
+- **Exact-scoreline prediction** — a separate Poisson + Dixon-Coles model estimates each
+  team's expected goals and turns that into a probability for every scoreline (most likely
+  score, top-5 scorelines, and a win/draw/loss split). Trained by the same `ml.train`
+  command, served at `POST /api/predict-score`.
 - **Explainability** — SHAP contributions per prediction, turned into readable reasons
   and a feature-contribution chart.
 - **Production shape** — FastAPI backend, typed React frontend, Postgres/SQLite, Docker
@@ -132,6 +136,7 @@ docker compose up --build
 | GET    | `/api/health`            | Service + model status                        |
 | GET    | `/api/teams`             | Available teams, years, stages                |
 | POST   | `/api/predict`           | Predict a match (probabilities + explanation) |
+| POST   | `/api/predict-score`     | Predict the exact scoreline distribution      |
 | GET    | `/api/model-performance` | Best model, metrics, feature importance       |
 
 **Example request**

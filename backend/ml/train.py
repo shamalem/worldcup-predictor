@@ -24,10 +24,12 @@ from sklearn.preprocessing import StandardScaler
 
 from .config import (
     ARTIFACTS_DIR, CLASS_LABELS, FEATURE_COLUMNS, FEATURE_DISPLAY,
-    MODEL_PATH, METADATA_PATH, save_wc_matches,
+    MODEL_PATH, METADATA_PATH, SCORE_MODEL_PATH, SCORE_METADATA_PATH,
+    save_wc_matches,
 )
 from .data_prep import load_world_cup_matches
 from .features import build_training_frame
+from .score_model import fit_score_model, evaluate as evaluate_score
 
 warnings.filterwarnings("ignore")
 
@@ -162,6 +164,52 @@ def main():
 
     print(f"Saved -> {MODEL_PATH.name}, {METADATA_PATH.name}, "
           f"{wc_path.name}")
+
+    # ------------------------------------------------------------------ #
+    # Also train the exact-scoreline (Poisson + Dixon-Coles) model.
+    # ------------------------------------------------------------------ #
+    try:
+        _train_score_model(wc)
+    except Exception as e:  # never let the score model break the main train
+        print(f"[warn] score model training skipped: {e}")
+
+
+def _train_score_model(wc: pd.DataFrame) -> None:
+    """Fit the Poisson/Dixon-Coles scoreline model and save its artifacts.
+
+    Strengths are fitted on matches before VALIDATION_FROM_YEAR for honest
+    held-out metrics, then the *served* model is refit on all matches.
+    """
+    print("\nTraining scoreline model (Poisson + Dixon-Coles)...")
+    train_df = wc[wc["year"] < VALIDATION_FROM_YEAR]
+    val_df = wc[wc["year"] >= VALIDATION_FROM_YEAR]
+    if len(train_df) < 50 or len(val_df) < 10:
+        # Too little to split — just report in-sample-ish numbers.
+        train_df, val_df = wc, wc
+
+    eval_model = fit_score_model(train_df)
+    metrics = evaluate_score(eval_model, val_df)
+    print(f"  exact-score acc={metrics.get('exact_score_accuracy')} "
+          f"outcome acc={metrics.get('outcome_accuracy')} "
+          f"goals MAE={metrics.get('total_goals_mae')}  rho={eval_model.rho}")
+
+    # Refit on everything for serving.
+    served = fit_score_model(wc)
+    with open(SCORE_MODEL_PATH, "wb") as f:
+        pickle.dump(served, f)
+
+    score_metadata = {
+        "model_name": "Poisson + Dixon-Coles",
+        "n_matches": int(len(wc)),
+        "league_avg_goals": round(served.league_avg, 4),
+        "host_multiplier": round(served.host_mult, 4),
+        "rho": round(served.rho, 4),
+        "validation_from_year": VALIDATION_FROM_YEAR,
+        "metrics": metrics,
+    }
+    with open(SCORE_METADATA_PATH, "w") as f:
+        json.dump(score_metadata, f, indent=2)
+    print(f"Saved -> {SCORE_MODEL_PATH.name}, {SCORE_METADATA_PATH.name}")
 
 
 if __name__ == "__main__":

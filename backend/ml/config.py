@@ -16,6 +16,10 @@ WC_MATCHES_PATH = ARTIFACTS_DIR / "wc_matches.parquet"
 # CSV fallback used automatically when pyarrow/fastparquet is unavailable.
 WC_MATCHES_CSV_PATH = ARTIFACTS_DIR / "wc_matches.csv"
 
+# Exact-scoreline (Poisson + Dixon-Coles) model artifacts.
+SCORE_MODEL_PATH = ARTIFACTS_DIR / "score_model.pkl"
+SCORE_METADATA_PATH = ARTIFACTS_DIR / "score_metadata.json"
+
 
 def save_wc_matches(df):
     """Persist the cleaned WC matches frame.
