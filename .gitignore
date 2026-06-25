@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Data & artifacts (large / generated)
+data/*.csv
+backend/artifacts/*.pkl
+backend/artifacts/*.parquet
+backend/artifacts/*.csv
+backend/artifacts/*.json
+*.db
+
+# Node / frontend
+node_modules/
+frontend/dist/
+.vite/
+
+# Env / editor
+.env
+.DS_Store
+.idea/
+.vscode/

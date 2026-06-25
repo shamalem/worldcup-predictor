@@ -1,0 +1,2 @@
+# Trained artifacts (model.pkl, model_metadata.json, wc_matches.parquet) land here
+# after running:  python -m ml.train
