@@ -68,6 +68,7 @@ def _row(stats, h2h, a, b, *, neutral, stage, year,
     feats["neutral"] = float(bool(neutral))
     feats["year_norm"] = round((year - YEAR_MIN) / (YEAR_MAX - YEAR_MIN), 4)
     feats["elo_diff"] = round(float(elo_diff), 2)
+    feats["elo_expectation"] = round(1.0 / (1.0 + 10 ** (-float(elo_diff) / 400.0)), 4)
     feats["a_recent_form"] = round(float(a_form), 4)
     feats["b_recent_form"] = round(float(b_form), 4)
     # Guarantee column order / completeness.

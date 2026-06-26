@@ -22,8 +22,9 @@ React + TypeScript (Vite)  ──►  FastAPI  ──►  scikit-learn / XGBoost
   importance and era. All features are computed **only from matches before the fixture**
   (no data leakage), and the training set is mirrored so the model is symmetric in
   Team A / Team B.
-- **Model bake-off** — Logistic Regression, Random Forest and XGBoost are trained and
-  compared; the best one (lowest validation log loss) is served.
+- **Model bake-off** — Logistic Regression, Random Forest and XGBoost are hyperparameter-
+  tuned by cross-validated grid search, then compared; the best one (lowest validation log
+  loss) is served.
 - **Team-strength Elo** — an importance-weighted Elo rating is computed over *all* ~49,000
   internationals (friendlies, qualifiers, continental cups, World Cups), with home-field and
   margin-of-victory adjustments. The Elo gap between the two sides is the model's most

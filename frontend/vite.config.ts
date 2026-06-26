@@ -1,4 +1,4 @@
-﻿import { defineConfig } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // In dev, proxy API calls to the FastAPI backend so the frontend can call /api/*.

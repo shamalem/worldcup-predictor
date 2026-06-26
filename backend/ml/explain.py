@@ -45,6 +45,8 @@ _TEMPLATES = {
                           "{A} and {B} have a meaningful head-to-head history."),
     "elo_diff":          ("{A} is the stronger side by overall Elo rating, across all internationals.",
                           "{B} is the stronger side by overall Elo rating, across all internationals."),
+    "elo_expectation":   ("{A}'s Elo rating implies a strong win probability.",
+                          "{B}'s Elo rating implies a strong win probability."),
     "a_recent_form":     ("{A} comes in with stronger recent form.",
                           "{A} comes in with weaker recent form."),
     "b_recent_form":     ("{B} comes in with weaker recent form.",

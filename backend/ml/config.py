@@ -112,6 +112,7 @@ FEATURE_COLUMNS = [
     "neutral",
     "year_norm",
     "elo_diff",
+    "elo_expectation",
     "a_recent_form",
     "b_recent_form",
 ]
@@ -139,6 +140,7 @@ FEATURE_DISPLAY = {
     "neutral": "Neutral venue",
     "year_norm": "Tournament era",
     "elo_diff": "Team strength gap (all-matches Elo)",
+    "elo_expectation": "Elo-implied win probability (Team A)",
     "a_recent_form": "Team A recent form (last 10 internationals)",
     "b_recent_form": "Team B recent form (last 10 internationals)",
 }

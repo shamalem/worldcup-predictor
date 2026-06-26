@@ -20,6 +20,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, log_loss
+from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import StandardScaler
 
 from .config import (
@@ -73,6 +74,42 @@ def _candidates():
             class_weight="balanced_subsample", random_state=42, n_jobs=-1),
         name: gb,
     }
+
+
+def _param_grid(name: str) -> dict:
+    """Small, sensible hyperparameter grids per model (kept modest so the
+    build/train step stays fast)."""
+    if name == "LogisticRegression":
+        return {"C": [0.1, 0.3, 1.0, 3.0]}
+    if name == "RandomForest":
+        return {"max_depth": [6, 10, None], "min_samples_leaf": [1, 3, 5]}
+    if name == "XGBoost":
+        return {"max_depth": [3, 4], "learning_rate": [0.03, 0.05],
+                "n_estimators": [300, 500], "min_child_weight": [1, 3]}
+    if name == "LightGBM":
+        return {"max_depth": [-1, 6], "learning_rate": [0.03, 0.05],
+                "n_estimators": [300, 500]}
+    if name == "GradientBoosting":
+        return {"max_depth": [2, 3], "learning_rate": [0.05, 0.1],
+                "n_estimators": [200, 400]}
+    return {}
+
+
+def _tune(name: str, estimator, X, y):
+    """Grid-search hyperparameters with 4-fold CV on log loss; return the best
+    estimator (unfitted) and its params. Falls back to the base estimator on
+    any failure so training never breaks."""
+    grid = _param_grid(name)
+    if not grid:
+        return estimator, {}
+    try:
+        search = GridSearchCV(
+            estimator, grid, scoring="neg_log_loss", cv=4, n_jobs=-1)
+        search.fit(X, y)
+        return search.best_estimator_, search.best_params_
+    except Exception as e:
+        print(f"  [warn] tuning {name} failed ({e}); using defaults")
+        return estimator, {}
 
 
 def _feature_importance(model, scaler, X_val) -> dict:
@@ -142,19 +179,24 @@ def main():
 
     results, fitted = {}, {}
     for name, clf in _candidates().items():
-        print(f"Training {name}...")
+        print(f"Tuning + training {name}...")
+        # 1) Find good hyperparameters via CV (without sample weights).
+        best_est, best_params = _tune(name, clf, X_train_s, y_train)
+        if best_params:
+            print(f"  best params: {best_params}")
+        # 2) Refit the chosen config with recency sample weights.
         try:
-            clf.fit(X_train_s, y_train, sample_weight=sample_weight)
+            best_est.fit(X_train_s, y_train, sample_weight=sample_weight)
         except TypeError:
-            clf.fit(X_train_s, y_train)  # estimator without sample_weight support
-        proba = clf.predict_proba(X_val_s)
+            best_est.fit(X_train_s, y_train)
+        proba = best_est.predict_proba(X_val_s)
         pred = proba.argmax(axis=1)
         results[name] = {
             "accuracy": round(float(accuracy_score(y_val, pred)), 4),
             "f1_macro": round(float(f1_score(y_val, pred, average="macro")), 4),
             "log_loss": round(float(log_loss(y_val, proba, labels=[0, 1, 2])), 4),
         }
-        fitted[name] = clf
+        fitted[name] = best_est
         print(f"  acc={results[name]['accuracy']} "
               f"f1={results[name]['f1_macro']} "
               f"logloss={results[name]['log_loss']}")
