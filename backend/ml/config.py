@@ -20,6 +20,9 @@ WC_MATCHES_CSV_PATH = ARTIFACTS_DIR / "wc_matches.csv"
 SCORE_MODEL_PATH = ARTIFACTS_DIR / "score_model.pkl"
 SCORE_METADATA_PATH = ARTIFACTS_DIR / "score_metadata.json"
 
+# Elo team-strength ratings (computed over ALL internationals).
+ELO_RATINGS_PATH = ARTIFACTS_DIR / "elo_ratings.json"
+
 
 def save_wc_matches(df):
     """Persist the cleaned WC matches frame.
@@ -105,6 +108,7 @@ FEATURE_COLUMNS = [
     "is_knockout",
     "neutral",
     "year_norm",
+    "elo_diff",
 ]
 
 # Human-readable labels for explanations / charts.
@@ -129,4 +133,5 @@ FEATURE_DISPLAY = {
     "is_knockout": "Knockout match",
     "neutral": "Neutral venue",
     "year_norm": "Tournament era",
+    "elo_diff": "Team strength gap (all-matches Elo)",
 }

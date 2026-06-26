@@ -25,11 +25,12 @@ from sklearn.preprocessing import StandardScaler
 from .config import (
     ARTIFACTS_DIR, CLASS_LABELS, FEATURE_COLUMNS, FEATURE_DISPLAY,
     MODEL_PATH, METADATA_PATH, SCORE_MODEL_PATH, SCORE_METADATA_PATH,
-    save_wc_matches,
+    ELO_RATINGS_PATH, save_wc_matches,
 )
 from .data_prep import load_world_cup_matches
 from .features import build_training_frame
 from .score_model import fit_score_model, evaluate as evaluate_score
+from .elo import load_all_internationals, compute_elo
 
 warnings.filterwarnings("ignore")
 
@@ -86,6 +87,18 @@ def _feature_importance(model, scaler, X_val) -> dict:
     }
 
 
+def _compute_elo_safe():
+    """Compute Elo from all internationals; degrade gracefully if unavailable."""
+    try:
+        all_df = load_all_internationals()
+        pre_match, final_ratings = compute_elo(all_df)
+        print(f"  rated {len(final_ratings)} teams from {len(all_df)} internationals")
+        return pre_match, final_ratings
+    except Exception as e:
+        print(f"  [warn] Elo unavailable ({e}); training without strength feature")
+        return None, None
+
+
 def main():
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -94,8 +107,12 @@ def main():
     print(f"  {len(wc)} World Cup finals matches "
           f"({wc['year'].min()}-{wc['year'].max()})")
 
+    print("Computing Elo ratings over all internationals...")
+    pre_match, final_ratings = _compute_elo_safe()
+
     print("Engineering features...")
-    frame = build_training_frame(wc)
+    frame = build_training_frame(wc, pre_match=pre_match,
+                                 final_ratings=final_ratings)
 
     train = frame[frame["year"] < VALIDATION_FROM_YEAR]
     valid = frame[frame["year"] >= VALIDATION_FROM_YEAR]
@@ -147,6 +164,12 @@ def main():
 
     # Persist clean WC matches for the API's live feature builder.
     wc_path = save_wc_matches(wc)
+
+    # Persist current Elo ratings for inference-time strength lookup.
+    if final_ratings:
+        import json as _json
+        ELO_RATINGS_PATH.write_text(
+            _json.dumps({k: round(v, 2) for k, v in final_ratings.items()}, indent=2))
 
     metadata = {
         "best_model": best_name,

@@ -43,6 +43,8 @@ _TEMPLATES = {
                           "{B} has the upper hand in head-to-head World Cup meetings."),
     "h2h_matches":       ("{A} and {B} have a meaningful head-to-head history.",
                           "{A} and {B} have a meaningful head-to-head history."),
+    "elo_diff":          ("{A} is the stronger side by overall Elo rating, across all internationals.",
+                          "{B} is the stronger side by overall Elo rating, across all internationals."),
     "a_is_host":         ("{A} benefits from host-nation advantage.",
                           "{A} does not have host-nation advantage."),
     "b_is_host":         ("{B} does not have host-nation advantage.",

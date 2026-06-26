@@ -24,6 +24,10 @@ React + TypeScript (Vite)  ──►  FastAPI  ──►  scikit-learn / XGBoost
   Team A / Team B.
 - **Model bake-off** — Logistic Regression, Random Forest and XGBoost are trained and
   compared; the best one (lowest validation log loss) is served.
+- **Team-strength Elo** — an importance-weighted Elo rating is computed over *all* ~49,000
+  internationals (friendlies, qualifiers, continental cups, World Cups), with home-field and
+  margin-of-victory adjustments. The Elo gap between the two sides is the model's most
+  influential feature, and gives even rarely-seen teams a strong current strength estimate.
 - **Exact-scoreline prediction** — a separate Poisson + Dixon-Coles model estimates each
   team's expected goals and turns that into a probability for every scoreline (most likely
   score, top-5 scorelines, and a win/draw/loss split). Trained by the same `ml.train`

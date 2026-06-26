@@ -17,6 +17,7 @@ from typing import Dict, Tuple
 import pandas as pd
 
 from .config import FEATURE_COLUMNS, STAGE_ORDER, KNOCKOUT_STAGES
+from .elo import elo_diff_for_match, BASE_RATING
 
 YEAR_MIN, YEAR_MAX = 1930, 2026
 
@@ -52,7 +53,7 @@ def _h2h_block(h2h: Dict[Tuple[str, str], Dict], a: str, b: str) -> Dict[str, fl
 
 
 def _row(stats, h2h, a, b, *, neutral, stage, year,
-         a_is_host, b_is_host) -> Dict[str, float]:
+         a_is_host, b_is_host, elo_diff=0.0) -> Dict[str, float]:
     """Assemble a full feature dict for the match (team a in slot A)."""
     feats: Dict[str, float] = {}
     feats.update(_team_block(stats, a, "a"))
@@ -64,6 +65,7 @@ def _row(stats, h2h, a, b, *, neutral, stage, year,
     feats["is_knockout"] = float(stage in KNOCKOUT_STAGES)
     feats["neutral"] = float(bool(neutral))
     feats["year_norm"] = round((year - YEAR_MIN) / (YEAR_MAX - YEAR_MIN), 4)
+    feats["elo_diff"] = round(float(elo_diff), 2)
     # Guarantee column order / completeness.
     return {c: feats[c] for c in FEATURE_COLUMNS}
 
@@ -97,9 +99,14 @@ def _update(stats, h2h, home, away, hs, as_, stage):
 # --------------------------------------------------------------------------- #
 # Public API
 # --------------------------------------------------------------------------- #
-def build_training_frame(wc_df: pd.DataFrame) -> pd.DataFrame:
+def build_training_frame(wc_df: pd.DataFrame, pre_match=None,
+                         final_ratings=None) -> pd.DataFrame:
     """Return X+y rows. Each match produces TWO rows (original + mirrored A/B)
-    so the model is symmetric and can't learn a "slot A is special" bias."""
+    so the model is symmetric and can't learn a "slot A is special" bias.
+
+    ``pre_match``/``final_ratings`` come from :func:`ml.elo.compute_elo`; when
+    provided, each row carries a leakage-free Elo strength gap.
+    """
     stats: Dict[str, Dict] = defaultdict(_new_team_stats)
     h2h: Dict[Tuple[str, str], Dict] = {}
     rows = []
@@ -110,16 +117,24 @@ def build_training_frame(wc_df: pd.DataFrame) -> pd.DataFrame:
         neutral, stage, year = bool(m["neutral"]), m["stage"], int(m["year"])
         host = not neutral  # non-neutral => home_team had host/home advantage
 
+        if pre_match is not None:
+            home_elo, away_elo = elo_diff_for_match(
+                pre_match, m["date"], home, away, final_ratings)
+        else:
+            home_elo = away_elo = BASE_RATING
+
         # Orientation 1: A = home
         r1 = _row(stats, h2h, home, away, neutral=neutral, stage=stage,
-                  year=year, a_is_host=host, b_is_host=False)
+                  year=year, a_is_host=host, b_is_host=False,
+                  elo_diff=home_elo - away_elo)
         r1["target"] = {"H": 0, "D": 1, "A": 2}[m["result"]]
         r1["year"] = year
         rows.append(r1)
 
         # Orientation 2 (mirror): A = away
         r2 = _row(stats, h2h, away, home, neutral=neutral, stage=stage,
-                  year=year, a_is_host=False, b_is_host=host)
+                  year=year, a_is_host=False, b_is_host=host,
+                  elo_diff=away_elo - home_elo)
         r2["target"] = {"H": 2, "D": 1, "A": 0}[m["result"]]
         r2["year"] = year
         rows.append(r2)
@@ -149,11 +164,17 @@ def build_feature_vector(
     neutral: bool,
     a_is_host: bool = False,
     b_is_host: bool = False,
+    final_ratings=None,
 ) -> Dict[str, float]:
     """One feature row for a hypothetical match (used at inference time)."""
     stats, h2h = build_accumulators(wc_df, year)
+    if final_ratings is not None:
+        elo_diff = (final_ratings.get(team_a, BASE_RATING)
+                    - final_ratings.get(team_b, BASE_RATING))
+    else:
+        elo_diff = 0.0
     return _row(
         stats, h2h, team_a, team_b,
         neutral=neutral, stage=stage, year=year,
-        a_is_host=a_is_host, b_is_host=b_is_host,
+        a_is_host=a_is_host, b_is_host=b_is_host, elo_diff=elo_diff,
     )

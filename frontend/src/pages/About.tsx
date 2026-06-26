@@ -12,9 +12,10 @@ export default function About() {
         <ol className="reasons">
           <li><span className="num">1</span><span><b>Data</b> — international results filtered to the <span className="mono">FIFA World Cup</span> tournament (no qualifiers, no friendlies).</span></li>
           <li><span className="num">2</span><span><b>Features</b> — per-team win rate, goals for/against, goal difference, match &amp; knockout experience, head-to-head, host advantage, stage and era — all computed from matches before the fixture.</span></li>
-          <li><span className="num">3</span><span><b>Models</b> — Logistic Regression, Random Forest and XGBoost are trained and compared; the best by validation log loss is served.</span></li>
-          <li><span className="num">4</span><span><b>Explainability</b> — SHAP contributions per prediction, converted to template sentences. No LLM involved.</span></li>
-          <li><span className="num">5</span><span><b>Scoreline model</b> — a separate Poisson + Dixon-Coles model estimates each side's expected goals and produces a probability for every scoreline, giving the most likely exact score alongside the win/draw/loss call.</span></li>
+          <li><span className="num">3</span><span><b>Team strength (Elo)</b> — an importance-weighted Elo rating computed over <i>all</i> ~49,000 internationals (not just World Cup games), so even teams with few WC matches get a strong, current strength estimate. The rating gap is the model's most influential feature.</span></li>
+          <li><span className="num">4</span><span><b>Models</b> — Logistic Regression, Random Forest and XGBoost are trained and compared; the best by validation log loss is served.</span></li>
+          <li><span className="num">5</span><span><b>Explainability</b> — SHAP contributions per prediction, converted to template sentences. No LLM involved.</span></li>
+          <li><span className="num">6</span><span><b>Scoreline model</b> — a separate Poisson + Dixon-Coles model estimates each side's expected goals and produces a probability for every scoreline, giving the most likely exact score alongside the win/draw/loss call.</span></li>
         </ol>
       </div>
 
