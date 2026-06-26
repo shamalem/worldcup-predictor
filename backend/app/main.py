@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .database import SessionLocal, init_db
 from .prediction import service
-from .routers import health, predict, performance, teams, score
+from .routers import health, predict, performance, teams
 
 # Built frontend (Vite `dist`) is copied here in the Docker/Render build so a
 # single web service can serve both the API and the website (same origin).
@@ -30,7 +30,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    for r in (health.router, teams.router, predict.router, performance.router, score.router):
+    for r in (health.router, teams.router, predict.router, performance.router):
         app.include_router(r, prefix="/api")
 
     @app.on_event("startup")

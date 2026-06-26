@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import type { TeamsResponse, PredictResponse, ScorePredictResponse } from "../types";
+import type { TeamsResponse, PredictResponse } from "../types";
 import { usePrediction } from "../PredictionContext";
 import ProbabilityBars from "../components/ProbabilityBars";
 
@@ -20,7 +20,6 @@ export default function Predict() {
   const [host, setHost] = useState<"A" | "B" | "none">("none");
 
   const [result, setResult] = useState<PredictResponse | null>(null);
-  const [score, setScore] = useState<ScorePredictResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -40,13 +39,8 @@ export default function Predict() {
     if (teamA === teamB) { setErr("Pick two different teams."); return; }
     setBusy(true);
     try {
-      // Outcome (win/draw/loss) and scoreline are independent models; fetch both.
-      const [res, sc] = await Promise.all([
-        api.predict({ team_a: teamA, team_b: teamB, year, stage, neutral, host }),
-        api.predictScore({ team_a: teamA, team_b: teamB, neutral, host }),
-      ]);
+      const res = await api.predict({ team_a: teamA, team_b: teamB, year, stage, neutral, host });
       setResult(res);
-      setScore(sc);
       setLast(res);
     } catch (e) {
       setErr((e as Error).message);
@@ -117,7 +111,7 @@ export default function Predict() {
 
         <div className="spacer" />
         <button className="btn" disabled={busy} onClick={submit}>
-          {busy ? "Crunching…" : "Predict outcome & score"}
+          {busy ? "Crunching…" : "Predict outcome"}
         </button>
         {err && <><div className="spacer" /><div className="error">{err}</div></>}
       </div>
@@ -135,59 +129,7 @@ export default function Predict() {
             <span className="confidence-pill">Confidence: {result.confidence} · {result.model_name}</span>
             <ProbabilityBars p={result} />
           </div>
-        </>
-      )}
 
-      {score && (
-        <>
-          <div className="spacer" />
-          <div className="card score-card">
-            <h3 className="section-title">Most likely scoreline</h3>
-            <div className="score-hero">
-              <span className="score-team">{score.team_a}</span>
-              <span className="score-digits">
-                {score.most_likely_score.team_a}
-                <span className="score-dash">–</span>
-                {score.most_likely_score.team_b}
-              </span>
-              <span className="score-team">{score.team_b}</span>
-            </div>
-            <div className="score-sub">
-              {Math.round(score.most_likely_score.probability * 100)}% likely · expected goals{" "}
-              {score.expected_goals.team_a} – {score.expected_goals.team_b}
-            </div>
-
-            <div className="spacer" />
-            <h4 className="section-title small">Top scorelines</h4>
-            <div className="scoreline-list">
-              {score.top_scorelines.map((s) => {
-                const pct = Math.round(s.probability * 100);
-                const isTop =
-                  s.team_a === score.most_likely_score.team_a &&
-                  s.team_b === score.most_likely_score.team_b;
-                return (
-                  <div className={"scoreline-row" + (isTop ? " top" : "")} key={s.label}>
-                    <span className="scoreline-label">{s.label}</span>
-                    <span className="scoreline-bar">
-                      <span className="scoreline-fill" style={{ width: `${Math.max(pct * 4, 6)}%` }} />
-                    </span>
-                    <span className="scoreline-pct">{pct}%</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="spacer" />
-            <p className="muted small">
-              Scoreline model: {score.model_name}. Exact scores are inherently hard to
-              call — treat these as a probability ranking, not a certainty.
-            </p>
-          </div>
-        </>
-      )}
-
-      {result && (
-        <>
           <div className="spacer" />
           <div className="card">
             <h3 className="section-title">Why this prediction</h3>

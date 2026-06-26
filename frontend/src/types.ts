@@ -40,32 +40,3 @@ export interface ModelPerformance {
   class_labels: string[];
 }
 
-export interface ScorePredictRequest {
-  team_a: string;
-  team_b: string;
-  neutral: boolean;
-  host: "A" | "B" | "none";
-}
-
-export interface Scoreline {
-  team_a: number;
-  team_b: number;
-  probability: number;
-  label: string;
-}
-
-export interface ScorePredictResponse {
-  team_a: string;
-  team_b: string;
-  expected_goals: { team_a: number; team_b: number };
-  most_likely_score: {
-    team_a: number;
-    team_b: number;
-    probability: number;
-    text: string;
-  };
-  top_scorelines: Scoreline[];
-  outcome_probabilities: { team_a: number; draw: number; team_b: number };
-  rho: number;
-  model_name: string;
-}

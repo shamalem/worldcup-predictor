@@ -3,8 +3,6 @@ import type {
   PredictRequest,
   PredictResponse,
   ModelPerformance,
-  ScorePredictRequest,
-  ScorePredictResponse,
 } from "./types";
 
 const BASE = "/api";
@@ -27,10 +25,4 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => handle<PredictResponse>(r)),
-  predictScore: (body: ScorePredictRequest) =>
-    fetch(`${BASE}/predict-score`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }).then((r) => handle<ScorePredictResponse>(r)),
 };

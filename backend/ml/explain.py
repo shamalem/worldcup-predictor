@@ -67,23 +67,32 @@ _TEMPLATES = {
 
 
 def _shap_contributions(bundle, x_scaled: np.ndarray, class_idx: int):
-    """Return SHAP values (per feature) for ``class_idx`` of one instance.
+    """Return per-feature contributions toward ``class_idx`` for one instance.
 
-    Falls back to a signed importance proxy if shap is unavailable or errors.
+    For linear models we use the closed-form SHAP value (exact for a linear
+    model with the training mean as baseline): ``coef[class] * x_scaled``. The
+    features are already standardized, so the baseline is the zero vector and
+    this is both exact and robust. For tree models we use shap.TreeExplainer
+    with the model's own expected-value baseline. A signed-importance proxy is
+    the last-resort fallback so we never return all-zeros.
     """
     model = bundle["model"]
+
+    # --- Linear models: exact closed-form SHAP (no degenerate background). ---
+    if hasattr(model, "coef_"):
+        coef = np.asarray(model.coef_, dtype=float)
+        if coef.ndim == 1:  # binary -> single row; class 1 is positive
+            row = coef if class_idx == 1 else -coef
+        else:
+            row = coef[class_idx]
+        return row * np.asarray(x_scaled[0], dtype=float)
+
+    # --- Tree models: TreeExplainer with its own baseline. ---
     try:
         import shap
 
-        if hasattr(model, "feature_importances_"):
-            explainer = shap.TreeExplainer(model)
-        elif hasattr(model, "coef_"):
-            explainer = shap.LinearExplainer(model, x_scaled)
-        else:
-            raise RuntimeError("no native explainer")
-
+        explainer = shap.TreeExplainer(model)
         sv = explainer.shap_values(x_scaled)
-        # Normalise shap output shape across versions/model types.
         if isinstance(sv, list):                 # list per class
             vals = np.asarray(sv[class_idx])[0]
         else:
@@ -92,17 +101,17 @@ def _shap_contributions(bundle, x_scaled: np.ndarray, class_idx: int):
                 vals = arr[0, :, class_idx]
             else:                                # (n, features)
                 vals = arr[0]
-        return np.asarray(vals, dtype=float)
+        vals = np.asarray(vals, dtype=float)
+        if np.any(np.abs(vals) > 1e-12):
+            return vals
+        raise RuntimeError("degenerate shap values")
     except Exception:
-        # Fallback: importance-weighted signed deviation from the mean (0 after
-        # scaling). Sign points toward larger feature value.
+        # Fallback: importance-weighted signed deviation from the mean.
         if hasattr(model, "feature_importances_"):
             imp = np.asarray(model.feature_importances_, dtype=float)
-        elif hasattr(model, "coef_"):
-            imp = np.abs(np.asarray(model.coef_)).mean(axis=0)
         else:
             imp = np.ones(len(FEATURE_COLUMNS))
-        return imp * x_scaled[0]
+        return imp * np.asarray(x_scaled[0], dtype=float)
 
 
 def _favours_a(feature: str, contrib: float, predicted_class: int) -> bool:
