@@ -32,7 +32,8 @@ React + TypeScript (Vite)  ──►  FastAPI  ──►  scikit-learn / XGBoost
 - **Recent form & recency weighting** — each team's form over its last 10 internationals is
   a feature, and training samples are time-decayed (4-year half-life, one World Cup cycle) so recent World Cups
   count more than decades-old ones.
-- **Exact-scoreline prediction** — a separate Poisson + Dixon-Coles model estimates each
+- **Exact-scoreline prediction** — a separate Poisson + Dixon-Coles model whose attack/
+  defence strengths are fitted over *all* internationals (recency-weighted) estimates each
   team's expected goals and turns that into a probability for every scoreline (most likely
   score, top-5 scorelines, and a win/draw/loss split). Trained by the same `ml.train`
   command, served at `POST /api/predict-score`.

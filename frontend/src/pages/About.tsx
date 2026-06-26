@@ -15,7 +15,7 @@ export default function About() {
           <li><span className="num">3</span><span><b>Team strength &amp; form</b> — an importance-weighted Elo rating computed over <i>all</i> ~49,000 internationals gives a current strength estimate, and each team's <b>recent form</b> over its last 10 internationals captures momentum. Recent World Cups are also weighted more heavily during training (4-year half-life, one World Cup cycle), so the model leans on the modern game.</span></li>
           <li><span className="num">4</span><span><b>Models</b> — Logistic Regression, Random Forest and XGBoost are hyperparameter-tuned by cross-validated grid search, then compared; the best by validation log loss is served.</span></li>
           <li><span className="num">5</span><span><b>Explainability</b> — SHAP contributions per prediction, converted to template sentences. No LLM involved.</span></li>
-          <li><span className="num">6</span><span><b>Scoreline model</b> — a separate Poisson + Dixon-Coles model estimates each side's expected goals and produces a probability for every scoreline, giving the most likely exact score alongside the win/draw/loss call.</span></li>
+          <li><span className="num">6</span><span><b>Scoreline model</b> — a separate Poisson + Dixon-Coles model whose attack/defence strengths are fitted over <i>all</i> internationals (recency-weighted) estimates each side's expected goals and produces a probability for every scoreline, giving the most likely exact score alongside the win/draw/loss call.</span></li>
         </ol>
       </div>
 
