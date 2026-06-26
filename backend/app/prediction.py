@@ -10,7 +10,7 @@ import pandas as pd
 
 from ml.config import (
     MODEL_PATH, METADATA_PATH, STAGE_ORDER, CLASS_LABELS,
-    ELO_RATINGS_PATH, wc_matches_available, load_wc_matches,
+    ELO_RATINGS_PATH, FORM_RATINGS_PATH, wc_matches_available, load_wc_matches,
 )
 from ml.data_prep import list_teams, list_years
 from ml.features import build_feature_vector
@@ -23,6 +23,7 @@ class ModelService:
         self.metadata: dict = {}
         self.wc: Optional[pd.DataFrame] = None
         self.elo_ratings: dict = {}
+        self.form_ratings: dict = {}
         self._load()
 
     # ----------------------------------------------------------------- load --
@@ -36,6 +37,8 @@ class ModelService:
             self.wc = load_wc_matches()
         if ELO_RATINGS_PATH.exists():
             self.elo_ratings = json.loads(ELO_RATINGS_PATH.read_text())
+        if FORM_RATINGS_PATH.exists():
+            self.form_ratings = json.loads(FORM_RATINGS_PATH.read_text())
 
     @property
     def ready(self) -> bool:
@@ -75,6 +78,7 @@ class ModelService:
             self.wc, team_a, team_b, year, stage,
             neutral=effective_neutral, a_is_host=a_is_host, b_is_host=b_is_host,
             final_ratings=self.elo_ratings or None,
+            final_form=self.form_ratings or None,
         )
         x = np.array([[row[c] for c in self.bundle["feature_columns"]]], dtype=float)
         x_scaled = self.bundle["scaler"].transform(x)

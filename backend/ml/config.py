@@ -23,6 +23,9 @@ SCORE_METADATA_PATH = ARTIFACTS_DIR / "score_metadata.json"
 # Elo team-strength ratings (computed over ALL internationals).
 ELO_RATINGS_PATH = ARTIFACTS_DIR / "elo_ratings.json"
 
+# Recent-form ratings (computed over ALL internationals).
+FORM_RATINGS_PATH = ARTIFACTS_DIR / "form_ratings.json"
+
 
 def save_wc_matches(df):
     """Persist the cleaned WC matches frame.
@@ -109,6 +112,8 @@ FEATURE_COLUMNS = [
     "neutral",
     "year_norm",
     "elo_diff",
+    "a_recent_form",
+    "b_recent_form",
 ]
 
 # Human-readable labels for explanations / charts.
@@ -134,4 +139,6 @@ FEATURE_DISPLAY = {
     "neutral": "Neutral venue",
     "year_norm": "Tournament era",
     "elo_diff": "Team strength gap (all-matches Elo)",
+    "a_recent_form": "Team A recent form (last 10 internationals)",
+    "b_recent_form": "Team B recent form (last 10 internationals)",
 }

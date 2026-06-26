@@ -25,12 +25,16 @@ from sklearn.preprocessing import StandardScaler
 from .config import (
     ARTIFACTS_DIR, CLASS_LABELS, FEATURE_COLUMNS, FEATURE_DISPLAY,
     MODEL_PATH, METADATA_PATH, SCORE_MODEL_PATH, SCORE_METADATA_PATH,
-    ELO_RATINGS_PATH, save_wc_matches,
+    ELO_RATINGS_PATH, FORM_RATINGS_PATH, save_wc_matches,
 )
 from .data_prep import load_world_cup_matches
 from .features import build_training_frame
 from .score_model import fit_score_model, evaluate as evaluate_score
 from .elo import load_all_internationals, compute_elo
+from .form import compute_form
+
+# Recency: a World Cup this many years in the past gets half the training weight.
+RECENCY_HALF_LIFE_YEARS = 8.0
 
 warnings.filterwarnings("ignore")
 
@@ -88,15 +92,16 @@ def _feature_importance(model, scaler, X_val) -> dict:
 
 
 def _compute_elo_safe():
-    """Compute Elo from all internationals; degrade gracefully if unavailable."""
+    """Compute Elo + recent form from all internationals; degrade gracefully."""
     try:
         all_df = load_all_internationals()
         pre_match, final_ratings = compute_elo(all_df)
+        pre_form, final_form = compute_form(all_df)
         print(f"  rated {len(final_ratings)} teams from {len(all_df)} internationals")
-        return pre_match, final_ratings
+        return pre_match, final_ratings, pre_form, final_form
     except Exception as e:
-        print(f"  [warn] Elo unavailable ({e}); training without strength feature")
-        return None, None
+        print(f"  [warn] Elo/form unavailable ({e}); training without them")
+        return None, None, None, None
 
 
 def main():
@@ -107,12 +112,13 @@ def main():
     print(f"  {len(wc)} World Cup finals matches "
           f"({wc['year'].min()}-{wc['year'].max()})")
 
-    print("Computing Elo ratings over all internationals...")
-    pre_match, final_ratings = _compute_elo_safe()
+    print("Computing Elo + recent-form ratings over all internationals...")
+    pre_match, final_ratings, pre_form, final_form = _compute_elo_safe()
 
     print("Engineering features...")
     frame = build_training_frame(wc, pre_match=pre_match,
-                                 final_ratings=final_ratings)
+                                 final_ratings=final_ratings,
+                                 pre_form=pre_form, final_form=final_form)
 
     train = frame[frame["year"] < VALIDATION_FROM_YEAR]
     valid = frame[frame["year"] >= VALIDATION_FROM_YEAR]
@@ -124,13 +130,23 @@ def main():
     X_val, y_val = valid[FEATURE_COLUMNS].values, valid["target"].values
     print(f"  train={len(X_train)} rows, validation={len(X_val)} rows")
 
+    # Recency weighting: recent World Cups inform the model more than 1950s ones.
+    # weight = 0.5 ** (years_ago / half_life)
+    max_year = int(frame["year"].max())
+    years_ago = (max_year - train["year"].values).astype(float)
+    sample_weight = 0.5 ** (years_ago / RECENCY_HALF_LIFE_YEARS)
+    print(f"  recency weighting on (half-life {RECENCY_HALF_LIFE_YEARS:.0f}y)")
+
     scaler = StandardScaler().fit(X_train)
     X_train_s, X_val_s = scaler.transform(X_train), scaler.transform(X_val)
 
     results, fitted = {}, {}
     for name, clf in _candidates().items():
         print(f"Training {name}...")
-        clf.fit(X_train_s, y_train)
+        try:
+            clf.fit(X_train_s, y_train, sample_weight=sample_weight)
+        except TypeError:
+            clf.fit(X_train_s, y_train)  # estimator without sample_weight support
         proba = clf.predict_proba(X_val_s)
         pred = proba.argmax(axis=1)
         results[name] = {
@@ -170,6 +186,11 @@ def main():
         import json as _json
         ELO_RATINGS_PATH.write_text(
             _json.dumps({k: round(v, 2) for k, v in final_ratings.items()}, indent=2))
+    # Persist current recent-form ratings for inference.
+    if final_form:
+        import json as _json
+        FORM_RATINGS_PATH.write_text(
+            _json.dumps({k: round(v, 4) for k, v in final_form.items()}, indent=2))
 
     metadata = {
         "best_model": best_name,

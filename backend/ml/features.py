@@ -18,6 +18,7 @@ import pandas as pd
 
 from .config import FEATURE_COLUMNS, STAGE_ORDER, KNOCKOUT_STAGES
 from .elo import elo_diff_for_match, BASE_RATING
+from .form import form_for_match, NEUTRAL_FORM
 
 YEAR_MIN, YEAR_MAX = 1930, 2026
 
@@ -53,7 +54,8 @@ def _h2h_block(h2h: Dict[Tuple[str, str], Dict], a: str, b: str) -> Dict[str, fl
 
 
 def _row(stats, h2h, a, b, *, neutral, stage, year,
-         a_is_host, b_is_host, elo_diff=0.0) -> Dict[str, float]:
+         a_is_host, b_is_host, elo_diff=0.0,
+         a_form=NEUTRAL_FORM, b_form=NEUTRAL_FORM) -> Dict[str, float]:
     """Assemble a full feature dict for the match (team a in slot A)."""
     feats: Dict[str, float] = {}
     feats.update(_team_block(stats, a, "a"))
@@ -66,6 +68,8 @@ def _row(stats, h2h, a, b, *, neutral, stage, year,
     feats["neutral"] = float(bool(neutral))
     feats["year_norm"] = round((year - YEAR_MIN) / (YEAR_MAX - YEAR_MIN), 4)
     feats["elo_diff"] = round(float(elo_diff), 2)
+    feats["a_recent_form"] = round(float(a_form), 4)
+    feats["b_recent_form"] = round(float(b_form), 4)
     # Guarantee column order / completeness.
     return {c: feats[c] for c in FEATURE_COLUMNS}
 
@@ -100,12 +104,14 @@ def _update(stats, h2h, home, away, hs, as_, stage):
 # Public API
 # --------------------------------------------------------------------------- #
 def build_training_frame(wc_df: pd.DataFrame, pre_match=None,
-                         final_ratings=None) -> pd.DataFrame:
+                         final_ratings=None, pre_form=None,
+                         final_form=None) -> pd.DataFrame:
     """Return X+y rows. Each match produces TWO rows (original + mirrored A/B)
     so the model is symmetric and can't learn a "slot A is special" bias.
 
-    ``pre_match``/``final_ratings`` come from :func:`ml.elo.compute_elo`; when
-    provided, each row carries a leakage-free Elo strength gap.
+    ``pre_match``/``final_ratings`` carry leakage-free Elo; ``pre_form``/
+    ``final_form`` carry leakage-free recent form. All come from the ml.elo /
+    ml.form helpers.
     """
     stats: Dict[str, Dict] = defaultdict(_new_team_stats)
     h2h: Dict[Tuple[str, str], Dict] = {}
@@ -123,10 +129,17 @@ def build_training_frame(wc_df: pd.DataFrame, pre_match=None,
         else:
             home_elo = away_elo = BASE_RATING
 
+        if pre_form is not None:
+            home_form, away_form = form_for_match(
+                pre_form, m["date"], home, away, final_form)
+        else:
+            home_form = away_form = NEUTRAL_FORM
+
         # Orientation 1: A = home
         r1 = _row(stats, h2h, home, away, neutral=neutral, stage=stage,
                   year=year, a_is_host=host, b_is_host=False,
-                  elo_diff=home_elo - away_elo)
+                  elo_diff=home_elo - away_elo,
+                  a_form=home_form, b_form=away_form)
         r1["target"] = {"H": 0, "D": 1, "A": 2}[m["result"]]
         r1["year"] = year
         rows.append(r1)
@@ -134,7 +147,8 @@ def build_training_frame(wc_df: pd.DataFrame, pre_match=None,
         # Orientation 2 (mirror): A = away
         r2 = _row(stats, h2h, away, home, neutral=neutral, stage=stage,
                   year=year, a_is_host=False, b_is_host=host,
-                  elo_diff=away_elo - home_elo)
+                  elo_diff=away_elo - home_elo,
+                  a_form=away_form, b_form=home_form)
         r2["target"] = {"H": 2, "D": 1, "A": 0}[m["result"]]
         r2["year"] = year
         rows.append(r2)
@@ -165,6 +179,7 @@ def build_feature_vector(
     a_is_host: bool = False,
     b_is_host: bool = False,
     final_ratings=None,
+    final_form=None,
 ) -> Dict[str, float]:
     """One feature row for a hypothetical match (used at inference time)."""
     stats, h2h = build_accumulators(wc_df, year)
@@ -173,8 +188,14 @@ def build_feature_vector(
                     - final_ratings.get(team_b, BASE_RATING))
     else:
         elo_diff = 0.0
+    if final_form is not None:
+        a_form = final_form.get(team_a, NEUTRAL_FORM)
+        b_form = final_form.get(team_b, NEUTRAL_FORM)
+    else:
+        a_form = b_form = NEUTRAL_FORM
     return _row(
         stats, h2h, team_a, team_b,
         neutral=neutral, stage=stage, year=year,
         a_is_host=a_is_host, b_is_host=b_is_host, elo_diff=elo_diff,
+        a_form=a_form, b_form=b_form,
     )
