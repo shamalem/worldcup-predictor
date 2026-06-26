@@ -39,6 +39,9 @@ export default function Explanation() {
         <h3 className="section-title">Feature contributions</h3>
         <p className="muted">Green pushes toward the predicted outcome; red pushes
           against it. Values are SHAP contributions for this specific matchup.</p>
+        <p className="muted small">Team strength (Elo) and recent form are computed from
+          <i> all ~49,000 internationals</i>; win rate, goals and knockout experience are
+          World-Cup-specific.</p>
         <div className="spacer" />
         <ContributionChart data={last.contributions} />
       </div>

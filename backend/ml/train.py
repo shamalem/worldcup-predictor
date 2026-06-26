@@ -257,38 +257,58 @@ def main():
     # Also train the exact-scoreline (Poisson + Dixon-Coles) model.
     # ------------------------------------------------------------------ #
     try:
-        _train_score_model(wc)
+        _train_score_model(wc, final_ratings)
     except Exception as e:  # never let the score model break the main train
         print(f"[warn] score model training skipped: {e}")
 
 
-def _train_score_model(wc: pd.DataFrame) -> None:
+def _train_score_model(wc: pd.DataFrame, elo_ratings=None) -> None:
     """Fit the Poisson/Dixon-Coles scoreline model and save its artifacts.
 
-    Strengths are fitted on matches before VALIDATION_FROM_YEAR for honest
-    held-out metrics, then the *served* model is refit on all matches.
+    Attack/defence strengths are fitted over *all* internationals (recency-
+    weighted), which is denser and more current than World-Cup matches alone.
+    Strengths are fitted on pre-validation data for honest held-out metrics,
+    then the served model is refit on everything.
     """
     print("\nTraining scoreline model (Poisson + Dixon-Coles)...")
+    try:
+        all_df = load_all_internationals()
+        all_df["_yr"] = all_df["date"].dt.year
+    except Exception as e:
+        print(f"  [warn] all-internationals unavailable ({e}); using WC-only strengths")
+        all_df = None
+
+    half_life = 8.0
     train_df = wc[wc["year"] < VALIDATION_FROM_YEAR]
     val_df = wc[wc["year"] >= VALIDATION_FROM_YEAR]
     if len(train_df) < 50 or len(val_df) < 10:
-        # Too little to split — just report in-sample-ish numbers.
         train_df, val_df = wc, wc
 
-    eval_model = fit_score_model(train_df)
+    # Honest eval: strengths from internationals strictly before validation.
+    eval_strength = None
+    if all_df is not None:
+        eval_strength = all_df[all_df["_yr"] < VALIDATION_FROM_YEAR]
+    eval_model = fit_score_model(
+        train_df, strength_df=eval_strength, recency_half_life=half_life,
+        ref_year=VALIDATION_FROM_YEAR - 1, elo_ratings=elo_ratings)
     metrics = evaluate_score(eval_model, val_df)
     print(f"  exact-score acc={metrics.get('exact_score_accuracy')} "
           f"outcome acc={metrics.get('outcome_accuracy')} "
           f"goals MAE={metrics.get('total_goals_mae')}  rho={eval_model.rho}")
 
-    # Refit on everything for serving.
-    served = fit_score_model(wc)
+    # Served model: refit strengths on ALL internationals (most current).
+    served = fit_score_model(
+        wc, strength_df=all_df, recency_half_life=half_life,
+        elo_ratings=elo_ratings)
     with open(SCORE_MODEL_PATH, "wb") as f:
         pickle.dump(served, f)
 
     score_metadata = {
         "model_name": "Poisson + Dixon-Coles",
         "n_matches": int(len(wc)),
+        "strength_source": "all internationals (recency-weighted)" if all_df is not None else "World Cup only",
+        "elo_anchored_split": bool(elo_ratings),
+        "recency_half_life_years": half_life,
         "league_avg_goals": round(served.league_avg, 4),
         "host_multiplier": round(served.host_mult, 4),
         "rho": round(served.rho, 4),

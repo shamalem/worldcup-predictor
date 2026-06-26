@@ -101,26 +101,36 @@ class ScoreModel:
     defence: dict = field(default_factory=dict)
     teams: list = field(default_factory=list)
     n_matches: int = 0
+    elo: dict = field(default_factory=dict)        # opponent-adjusted strength
+    elo_blend: float = 0.6                          # weight on Elo for the split
 
 
-def _accumulate_strengths(df: pd.DataFrame, league_avg: float):
+def _accumulate_strengths(df: pd.DataFrame, league_avg: float,
+                          half_life=None, ref_year=None):
     """Empirical, shrunk attack/defence ratings from a set of matches.
 
     attack[t]  > 1  -> scores more than an average side
     defence[t] > 1  -> concedes more than average (i.e. a *weaker* defence)
+
+    When ``half_life`` is given, each match is weighted by
+    ``0.5 ** (years_before_ref / half_life)`` so recent results count more.
     """
     scored: dict[str, float] = {}
     conceded: dict[str, float] = {}
-    played: dict[str, int] = {}
+    played: dict[str, float] = {}
 
-    def add(team, gf, ga):
-        scored[team] = scored.get(team, 0.0) + gf
-        conceded[team] = conceded.get(team, 0.0) + ga
-        played[team] = played.get(team, 0) + 1
+    def add(team, gf, ga, w):
+        scored[team] = scored.get(team, 0.0) + gf * w
+        conceded[team] = conceded.get(team, 0.0) + ga * w
+        played[team] = played.get(team, 0.0) + w
 
     for _, r in df.iterrows():
-        add(r["home_team"], r["home_score"], r["away_score"])
-        add(r["away_team"], r["away_score"], r["home_score"])
+        w = 1.0
+        if half_life and ref_year is not None:
+            yrs = ref_year - pd.Timestamp(r["date"]).year
+            w = 0.5 ** (max(yrs, 0) / half_life)
+        add(r["home_team"], r["home_score"], r["away_score"], w)
+        add(r["away_team"], r["away_score"], r["home_score"], w)
 
     attack, defence = {}, {}
     for team, n in played.items():
@@ -171,17 +181,44 @@ def expected_goals(model: "ScoreModel", team_a: str, team_b: str,
         lam_a *= model.host_mult
     if b_is_host:
         lam_b *= model.host_mult
+
+    # Opponent-adjusted correction: the raw attack/defence ratios don't account
+    # for schedule strength (a team that feasts on weak opponents looks better
+    # than it is). Elo *is* opponent-adjusted, so we keep the TOTAL expected
+    # goals from the ratio model (captures how open/defensive the match is) but
+    # let Elo decide how those goals are SPLIT between the sides.
+    elo = getattr(model, "elo", None) or {}
+    blend = getattr(model, "elo_blend", 0.0)
+    if elo and blend > 0:
+        ea = elo.get(team_a, 1500.0)
+        eb = elo.get(team_b, 1500.0)
+        total = lam_a + lam_b
+        if total > 0:
+            pa = 1.0 / (1.0 + 10 ** (-(ea - eb) / 400.0))  # Elo share for A
+            share = (1.0 - blend) * (lam_a / total) + blend * pa
+            lam_a, lam_b = total * share, total * (1.0 - share)
+
     # Guard against pathological values.
     return float(np.clip(lam_a, 0.05, 8.0)), float(np.clip(lam_b, 0.05, 8.0))
 
 
-def fit_score_model(df: pd.DataFrame) -> ScoreModel:
-    """Fit the full score model on a set of World Cup matches."""
+def fit_score_model(df: pd.DataFrame, strength_df: pd.DataFrame = None,
+                    recency_half_life: float = 8.0,
+                    ref_year: int = None,
+                    elo_ratings: dict = None,
+                    elo_blend: float = 0.6) -> ScoreModel:
+    """Fit the score model.
+
+    ``df`` is the set of World Cup matches used to set the scoring *level*
+    (league average) and the host advantage. When ``strength_df`` is provided
+    (typically *all* internationals), the attack/defence strengths are fitted
+    from it with recency weighting — far denser and more current than World-Cup
+    matches alone. Falls back to fitting strengths from ``df`` itself.
+    """
     total_goals = float(df["home_score"].sum() + df["away_score"].sum())
     league_avg = total_goals / (2 * len(df)) if len(df) else 1.3
 
-    # Host advantage: how much more do non-neutral home sides score vs the away
-    # side in the same matches? Clipped to a sensible range; default if sparse.
+    # Host advantage from non-neutral World Cup matches (WC-specific context).
     non_neutral = df[~df["neutral"].astype(bool)]
     if len(non_neutral) >= 20:
         h = non_neutral["home_score"].mean()
@@ -190,7 +227,16 @@ def fit_score_model(df: pd.DataFrame) -> ScoreModel:
     else:
         host_mult = 1.25
 
-    attack, defence = _accumulate_strengths(df, league_avg)
+    if strength_df is not None and len(strength_df):
+        if ref_year is None:
+            ref_year = int(pd.to_datetime(strength_df["date"]).dt.year.max())
+        attack, defence = _accumulate_strengths(
+            strength_df, league_avg, half_life=recency_half_life, ref_year=ref_year)
+        rho_source = df  # fit the low-score correction on WC matches
+    else:
+        attack, defence = _accumulate_strengths(df, league_avg)
+        rho_source = df
+
     model = ScoreModel(
         league_avg=league_avg,
         host_mult=host_mult,
@@ -199,8 +245,10 @@ def fit_score_model(df: pd.DataFrame) -> ScoreModel:
         defence=defence,
         teams=sorted(attack.keys()),
         n_matches=len(df),
+        elo=elo_ratings or {},
+        elo_blend=elo_blend if elo_ratings else 0.0,
     )
-    model.rho = _fit_rho(df, model)
+    model.rho = _fit_rho(rho_source, model)
     return model
 
 
