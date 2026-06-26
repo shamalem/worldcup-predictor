@@ -35,7 +35,9 @@ from .elo import load_all_internationals, compute_elo
 from .form import compute_form
 
 # Recency: a World Cup this many years in the past gets half the training weight.
-RECENCY_HALF_LIFE_YEARS = 8.0
+# 4 years = one World Cup cycle. Swept empirically: this maximises validation
+# accuracy while keeping log loss flat; shorter half-lives (2-3y) overfit and hurt.
+RECENCY_HALF_LIFE_YEARS = 4.0
 
 warnings.filterwarnings("ignore")
 

@@ -30,7 +30,7 @@ React + TypeScript (Vite)  ──►  FastAPI  ──►  scikit-learn / XGBoost
   margin-of-victory adjustments. The Elo gap between the two sides is the model's most
   influential feature, and gives even rarely-seen teams a strong current strength estimate.
 - **Recent form & recency weighting** — each team's form over its last 10 internationals is
-  a feature, and training samples are time-decayed (8-year half-life) so recent World Cups
+  a feature, and training samples are time-decayed (4-year half-life, one World Cup cycle) so recent World Cups
   count more than decades-old ones.
 - **Exact-scoreline prediction** — a separate Poisson + Dixon-Coles model estimates each
   team's expected goals and turns that into a probability for every scoreline (most likely
