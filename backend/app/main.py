@@ -2,14 +2,21 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import SessionLocal, init_db
 from .prediction import service
 from .routers import health, predict, performance, teams, score
+
+# Built frontend (Vite `dist`) is copied here in the Docker/Render build so a
+# single web service can serve both the API and the website (same origin).
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 def create_app() -> FastAPI:
@@ -31,9 +38,29 @@ def create_app() -> FastAPI:
         init_db()
         _sync_model_metadata()
 
-    @app.get("/")
-    def root():
-        return {"name": settings.app_name, "docs": "/docs", "health": "/api/health"}
+    # ---------------------------------------------------------------- #
+    # Serve the built frontend when present (production / Render). In local
+    # dev the static dir won't exist and the Vite server handles the UI.
+    # ---------------------------------------------------------------- #
+    if STATIC_DIR.is_dir():
+        assets = STATIC_DIR / "assets"
+        if assets.is_dir():
+            app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+        @app.get("/{full_path:path}")
+        def spa(full_path: str):
+            # Never shadow the API namespace.
+            if full_path.startswith("api/") or full_path == "api":
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
+            candidate = STATIC_DIR / full_path
+            if full_path and candidate.is_file():
+                return FileResponse(candidate)
+            # SPA fallback: let React Router resolve the client-side route.
+            return FileResponse(STATIC_DIR / "index.html")
+    else:
+        @app.get("/")
+        def root():
+            return {"name": settings.app_name, "docs": "/docs", "health": "/api/health"}
 
     return app
 

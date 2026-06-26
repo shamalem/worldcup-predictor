@@ -129,6 +129,39 @@ docker compose up --build
 
 ---
 
+## ☁️ Deploy to Render (one public URL, free tier)
+
+This repo ships a `render.yaml` blueprint and a root `Dockerfile` that build the
+frontend and backend into **one web service** — the API and the website are served
+from the same origin (no CORS setup), and the model is downloaded + trained during
+the build, so the running container starts ready to serve.
+
+1. Push this repo to GitHub (you've already done this).
+2. Go to **[render.com](https://render.com)** → sign in with GitHub.
+3. Click **New + → Blueprint**, pick your `worldcup-predictor` repo, and **Apply**.
+   Render reads `render.yaml`, builds the Docker image, and deploys it.
+4. Wait for the first build (a few minutes — it installs deps and trains the model).
+   When it's live, open the service's URL (like `https://worldcup-predictor.onrender.com`)
+   and use the app directly. The API docs are at `<your-url>/docs`.
+
+Notes:
+- **Free tier** spins the service down after inactivity, so the first request after a
+  while takes ~30–60s to wake up. That's normal.
+- The build trains the model automatically; you don't run any commands.
+- Predictions are stored in SQLite on the container's ephemeral disk, so they reset on
+  each deploy. To keep them, create a Render **PostgreSQL** instance and set the
+  `DATABASE_URL` env var to its Internal URL (see the comment in `render.yaml`).
+
+You can also deploy the same `Dockerfile` to any Docker host:
+
+```bash
+docker build -t worldcup-predictor .
+docker run -p 8000:8000 worldcup-predictor
+# open http://localhost:8000
+```
+
+---
+
 ## 🔌 API
 
 | Method | Endpoint                 | Description                                   |

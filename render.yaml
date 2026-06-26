@@ -1,0 +1,22 @@
+# Render Blueprint — deploys the whole app as a single Docker web service.
+# In Render: New + → Blueprint → connect this repo → Apply.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: worldcup-predictor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Same-origin static serving means CORS isn't strictly needed, but keep
+      # it permissive so the API is also reachable from other tools.
+      - key: CORS_ORIGINS
+        value: "*"
+      # SQLite on the container's ephemeral disk — stored predictions reset on
+      # each deploy, which is fine for a demo. To persist them, create a Render
+      # PostgreSQL instance and set DATABASE_URL to its *Internal* URL, e.g.
+      #   postgresql+psycopg://USER:PASSWORD@HOST:5432/DBNAME
+      - key: DATABASE_URL
+        value: "sqlite:///./worldcup.db"

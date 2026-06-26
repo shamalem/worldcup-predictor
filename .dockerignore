@@ -1,0 +1,12 @@
+# Keep the Docker build context small and reproducible.
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+.git
+.github
+*.db
+backend/artifacts/*
+data/*.csv
+frontend/dist
+**/.DS_Store
