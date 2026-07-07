@@ -1,4 +1,5 @@
 # ⚽ Explainable FIFA World Cup Match Predictor
+https://worldcup-predictor-kg47.onrender.com
 
 Predict the outcome of a **FIFA World Cup** match — **Team A win / Draw / Team B win** —
 with calibrated probabilities and **model-based explanations** (SHAP + template
